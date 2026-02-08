@@ -6,11 +6,12 @@
 
 <style>
 :root{
-  --quat-green:#22c55e;
-  --quat-blue:#2563eb;
-  --quat-purple:#7c3aed;
-  --quat-bg:#020617;
-  --quat-border:#64748b;
+  --green:#22c55e;
+  --red:#ef4444;
+  --blue:#2563eb;
+  --purple:#7c3aed;
+  --bg:#020617;
+  --border:#64748b;
 }
 
 body{
@@ -18,8 +19,8 @@ body{
   color:#e5e7eb;
   font-family:system-ui,sans-serif;
   display:flex;
-  justify-content:center;
   align-items:center;
+  justify-content:center;
   height:100vh;
 }
 
@@ -27,11 +28,11 @@ body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:10px;
+  gap:8px;
 }
 
 /* ===== HERO ===== */
-#quatHero{
+#hero{
   display:flex;
   align-items:center;
   gap:14px;
@@ -42,44 +43,41 @@ body{
   display:flex;align-items:center;justify-content:center;
   font-weight:700;cursor:pointer;
   user-select:none;
-  background:var(--quat-blue);
+  background:var(--blue);
 }
-.circle.submit{background:var(--quat-purple);}
+.circle.submit{background:var(--purple);}
 
 .boxes{display:flex;gap:6px;}
 .box{
   width:38px;height:38px;
-  border:2px solid var(--quat-border);
-  background:var(--quat-bg);
+  border:2px solid var(--border);
+  background:var(--bg);
   display:flex;align-items:center;justify-content:center;
   font-weight:700;
 }
 .box.active{
-  background:var(--quat-green);
+  background:var(--green);
   color:#022c22;
-  border-color:var(--quat-green);
+  border-color:var(--green);
 }
+
+/* ===== STATUS ===== */
+#status{
+  font-size:13px;
+  min-height:18px;
+}
+.fail{color:var(--red);}
+.success{color:var(--green);}
 
 /* ===== VERIFIED ===== */
 #verified{
   display:none;
   align-items:center;
   gap:8px;
-  color:var(--quat-green);
+  color:var(--green);
   font-size:16px;
   font-weight:600;
 }
-
-/* ===== RETRY (FAIL ONLY) ===== */
-#retry{
-  display:none;
-  background:none;
-  border:none;
-  color:#94a3b8;
-  font-size:12px;
-  cursor:pointer;
-}
-#retry:hover{color:#e5e7eb;}
 </style>
 </head>
 
@@ -87,8 +85,7 @@ body{
 
 <div id="quat">
 
-  <!-- HERO -->
-  <div id="quatHero">
+  <div id="hero">
     <div class="circle" id="tap">●</div>
 
     <div class="boxes">
@@ -101,16 +98,13 @@ body{
     <div class="circle submit" id="submit">●</div>
   </div>
 
-  <!-- VERIFIED -->
+  <div id="status"></div>
   <div id="verified">✔ Verified by QUAT</div>
-
-  <!-- RETRY (FAIL ONLY) -->
-  <button id="retry">Try again</button>
 
 </div>
 
 <script>
-/* ===== LOCK CONSOLE ===== */
+/* ===== HARD LOCK ===== */
 (()=>{["log","warn","error","debug","info","trace"].forEach(k=>console[k]=()=>{});})();
 
 /* ===== CONFIG ===== */
@@ -128,9 +122,9 @@ let clicks=[],moves=[],submitted=false,last=null;
 
 /* ===== ELEMENTS ===== */
 const boxes=document.querySelectorAll(".box");
-const hero=document.getElementById("quatHero");
+const hero=document.getElementById("hero");
+const status=document.getElementById("status");
 const verified=document.getElementById("verified");
-const retry=document.getElementById("retry");
 const tap=document.getElementById("tap");
 const submit=document.getElementById("submit");
 
@@ -141,7 +135,7 @@ const submit=document.getElementById("submit");
   },{passive:false});
 });
 
-/* ===== ENTROPY (DESKTOP ONLY) ===== */
+/* ===== POINTER ENTROPY (DESKTOP ONLY) ===== */
 if(USE_ENTROPY){
   window.addEventListener("pointermove",e=>{
     if(submitted||!e.isTrusted||e.pointerType!=="mouse") return;
@@ -182,13 +176,11 @@ function paint(){
   });
 }
 
-/* ===== RESET (FAIL ONLY) ===== */
+/* ===== FULL RESET ===== */
 function resetAll(){
   clicks=[];moves=[];submitted=false;last=null;
   boxes.forEach(b=>{b.classList.remove("active");b.textContent="";});
-  hero.style.display="flex";
-  verified.style.display="none";
-  retry.style.display="none";
+  status.textContent="";
 }
 
 /* ===== TAP ===== */
@@ -204,7 +196,7 @@ submit.addEventListener("pointerdown",e=>{
   submitted=true;
 
   if(clicks.length!==4){
-    retry.style.display="block";
+    fail("Incomplete interaction");
     return;
   }
 
@@ -217,18 +209,26 @@ submit.addEventListener("pointerdown",e=>{
   const timingOK=t.every(v=>v>=MIN&&v<=MAX);
   const pass=timingOK && entropyOK();
 
-  if(pass){
-    hero.style.display="none";
-    retry.style.display="none";   // ✅ NO RETRY AFTER SUCCESS
-    verified.style.display="flex";
-  }else{
-    retry.style.display="block"; // retry only on fail
-    submitted=false;
-  }
+  pass ? success() : fail("Behavior verification failed");
 });
 
-/* ===== RETRY ===== */
-retry.onclick=resetAll;
+/* ===== SUCCESS ===== */
+function success(){
+  hero.style.display="none";
+  status.textContent="";
+  verified.style.display="flex";
+}
+
+/* ===== FAIL (AUTO RESET) ===== */
+function fail(msg){
+  status.textContent=msg;
+  status.className="fail";
+
+  setTimeout(()=>{
+    status.className="";
+    resetAll();          // 🔄 auto reset
+  },900);
+}
 </script>
 
 </body>
