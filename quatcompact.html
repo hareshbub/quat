@@ -60,7 +60,7 @@ body{
   border-color:var(--quat-green);
 }
 
-/* ===== VERIFIED STATE ===== */
+/* ===== VERIFIED ===== */
 #verified{
   display:none;
   align-items:center;
@@ -70,7 +70,7 @@ body{
   font-weight:600;
 }
 
-/* ===== FOOTER ===== */
+/* ===== RETRY (FAIL ONLY) ===== */
 #retry{
   display:none;
   background:none;
@@ -104,7 +104,7 @@ body{
   <!-- VERIFIED -->
   <div id="verified">✔ Verified by QUAT</div>
 
-  <!-- RETRY -->
+  <!-- RETRY (FAIL ONLY) -->
   <button id="retry">Try again</button>
 
 </div>
@@ -182,7 +182,7 @@ function paint(){
   });
 }
 
-/* ===== RESET ===== */
+/* ===== RESET (FAIL ONLY) ===== */
 function resetAll(){
   clicks=[];moves=[];submitted=false;last=null;
   boxes.forEach(b=>{b.classList.remove("active");b.textContent="";});
@@ -203,22 +203,27 @@ submit.addEventListener("pointerdown",e=>{
   if(submitted||!e.isTrusted) return;
   submitted=true;
 
-  if(clicks.length!==4) return resetAll();
+  if(clicks.length!==4){
+    retry.style.display="block";
+    return;
+  }
 
   const t=[
     clicks[1]-clicks[0],
     clicks[2]-clicks[1],
     clicks[3]-clicks[2]
   ];
+
   const timingOK=t.every(v=>v>=MIN&&v<=MAX);
   const pass=timingOK && entropyOK();
 
   if(pass){
     hero.style.display="none";
+    retry.style.display="none";   // ✅ NO RETRY AFTER SUCCESS
     verified.style.display="flex";
-    retry.style.display="block";
   }else{
-    resetAll();
+    retry.style.display="block"; // retry only on fail
+    submitted=false;
   }
 });
 
