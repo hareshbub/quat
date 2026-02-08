@@ -57,7 +57,14 @@ body{
   border-color:var(--quat-accent);
 }
 
-.quat-status{font-size:13px;min-height:18px;}
+.quat-status{
+  font-size:13px;
+  min-height:20px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
 .success{color:#22c55e;}
 .fail{color:#ef4444;}
 
@@ -95,11 +102,9 @@ const MIN=80, MAX=350;
 const ENTROPY_THRESHOLD=1.8;
 const MIN_UNIQUE=8;
 
-/* ===== DEVICE DETECTION ===== */
+/* ===== DEVICE CHECK ===== */
 const IS_TOUCH_DEVICE =
-  ("ontouchstart" in window) ||
-  navigator.maxTouchPoints > 0;
-
+  ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
 const USE_ENTROPY = !IS_TOUCH_DEVICE;
 
 /* ===== CALLBACKS ===== */
@@ -127,8 +132,7 @@ const status=document.getElementById("status");
 /* ===== ENTROPY COLLECTION (DESKTOP ONLY) ===== */
 if(USE_ENTROPY){
   window.addEventListener("pointermove",e=>{
-    if(submitted||!e.isTrusted) return;
-    if(e.pointerType!=="mouse") return;
+    if(submitted||!e.isTrusted||e.pointerType!=="mouse") return;
 
     if(last){
       const dx=e.clientX-last.x;
@@ -145,15 +149,14 @@ if(USE_ENTROPY){
 /* ===== ENTROPY CHECK ===== */
 function entropyOK(){
   if(!USE_ENTROPY) return true;
-
   if(moves.length<30) return false;
 
   const mags=moves.map(p=>Math.hypot(p.x,p.y).toFixed(1));
   const unique=new Set(mags).size;
 
   const freq={}; mags.forEach(m=>freq[m]=(freq[m]||0)+1);
-
   let H=0,n=mags.length;
+
   for(const k in freq){
     const p=freq[k]/n;
     H-=p*Math.log2(p);
@@ -173,7 +176,8 @@ function paint(){
 /* ===== RESET ===== */
 function resetState(){
   clicks=[];moves=[];submitted=false;last=null;
-  status.textContent="";status.className="quat-status";
+  status.textContent="";
+  status.className="quat-status";
   boxes.forEach(b=>{b.classList.remove("active");b.textContent="";});
 }
 
@@ -204,13 +208,20 @@ submit.addEventListener("pointerdown",e=>{
   const timingOK=t.every(v=>v>=MIN&&v<=MAX);
   const pass=timingOK && entropyOK();
 
-  status.className="quat-status "+(pass?"success":"fail");
-  status.textContent=pass?"Human verified ✔":"Verification failed";
+  if(pass){
+    status.className="quat-status success";
+    status.innerHTML="✔ Verified by QUAT";
+    QUAT_CALLBACKS.onPass();
+  }else{
+    status.className="quat-status fail";
+    status.textContent="Verification failed";
+    QUAT_CALLBACKS.onFail();
+  }
 
-  pass?QUAT_CALLBACKS.onPass():QUAT_CALLBACKS.onFail();
-  setTimeout(resetState,700);
+  setTimeout(resetState,800);
 });
 </script>
 
 </body>
 </html>
+s
