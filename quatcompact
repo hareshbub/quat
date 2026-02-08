@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QUAT Compact</title>
+
+<style>
+:root {
+  --quat-accent: #22c55e;
+  --quat-primary: #2563eb;
+  --quat-entropy: #7c3aed;
+  --quat-bg: #020617;
+  --quat-border: #64748b;
+}
+
+body {
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:system-ui,sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+
+/* ===== QUAT WRAPPER ===== */
+#quat {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+}
+
+/* ===== ROW ===== */
+.quat-row {
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+/* ===== CIRCLES ===== */
+.quat-circle {
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  cursor:pointer;
+  user-select:none;
+  background:var(--quat-primary);
+}
+
+.quat-circle.entropy {
+  background:var(--quat-entropy);
+}
+
+/* ===== SQUARES ===== */
+.quat-boxes {
+  display:flex;
+  gap:6px;
+}
+
+.quat-box {
+  width:38px;
+  height:38px;
+  border:2px solid var(--quat-border);
+  background:var(--quat-bg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+}
+
+.quat-box.active {
+  background:var(--quat-accent);
+  color:#022c22;
+  border-color:var(--quat-accent);
+}
+
+/* ===== FOOTER ===== */
+.quat-note {
+  font-size:12px;
+  opacity:.8;
+}
+
+.quat-status {
+  font-size:13px;
+  min-height:18px;
+}
+.success {color:#22c55e;}
+.fail {color:#ef4444;}
+</style>
+</head>
+
+<body>
+
+<div id="quat">
+  <div class="quat-row">
+    <div class="quat-circle" id="quatTap">●</div>
+
+    <div class="quat-boxes">
+      <div class="quat-box"></div>
+      <div class="quat-box"></div>
+      <div class="quat-box"></div>
+      <div class="quat-box"></div>
+    </div>
+
+    <div class="quat-circle entropy" id="quatSubmit">●</div>
+  </div>
+
+  <div class="quat-status" id="status"></div>
+  <div class="quat-note">QUAT — human verification using timing & entropy</div>
+</div>
+
+<script>
+/* ===== LOCK CONSOLE ===== */
+(()=>{["log","warn","error","debug","info","trace"].forEach(k=>console[k]=()=>{});})();
+
+/* ===== CONFIG ===== */
+const LETTERS = ["Q","U","A","T"];
+const MIN = 80, MAX = 350;
+const ENTROPY_THRESHOLD = 1.8;
+const MIN_UNIQUE = 8;
+
+/* ===== STATE ===== */
+let clicks=[], moves=[], submitted=false, last=null;
+
+/* ===== ELEMENTS ===== */
+const boxes=document.querySelectorAll(".quat-box");
+const tap=document.getElementById("quatTap");
+const submit=document.getElementById("quatSubmit");
+const status=document.getElementById("status");
+
+/* ===== BLOCK KEYS ===== */
+["keydown","keypress","keyup"].forEach(e=>{
+  window.addEventListener(e,ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+  },{passive:false});
+});
+
+/* ===== TRUSTED POINTER ===== */
+window.addEventListener("pointermove",e=>{
+  if(submitted||!e.isTrusted) return;
+  if(!["mouse","touch","pen"].includes(e.pointerType)) return;
+
+  if(last){
+    const dx=e.clientX-last.x;
+    const dy=e.clientY-last.y;
+    if(dx||dy){
+      moves.push({x:dx,y:dy});
+      if(moves.length>150) moves.shift();
+    }
+  }
+  last={x:e.clientX,y:e.clientY};
+});
+
+/* ===== ENTROPY ===== */
+function entropyOK(){
+  if(moves.length<30) return false;
+  const mags=moves.map(p=>Math.hypot(p.x,p.y).toFixed(1));
+  const unique=new Set(mags).size;
+  const freq={}; mags.forEach(m=>freq[m]=(freq[m]||0)+1);
+  let H=0; const n=mags.length;
+  for(const k in freq){const p=freq[k]/n; H-=p*Math.log2(p);}
+  return H>=ENTROPY_THRESHOLD && unique>=MIN_UNIQUE;
+}
+
+/* ===== UI ===== */
+function paint(){
+  boxes.forEach((b,i)=>{
+    b.classList.toggle("active",i<clicks.length);
+    b.textContent=i<clicks.length?LETTERS[i]:"";
+  });
+}
+
+/* ===== TAP ===== */
+tap.addEventListener("pointerdown",e=>{
+  if(submitted||!e.isTrusted||clicks.length>=4) return;
+  clicks.push(performance.now());
+  paint();
+});
+
+/* ===== SUBMIT ===== */
+submit.addEventListener("pointerdown",e=>{
+  if(submitted||!e.isTrusted) return;
+  submitted=true;
+
+  if(clicks.length!==4){
+    status.textContent="Complete QUAT first";
+    status.className="quat-status fail";
+    return;
+  }
+
+  const t=[
+    clicks[1]-clicks[0],
+    clicks[2]-clicks[1],
+    clicks[3]-clicks[2]
+  ];
+  const timing=t.every(v=>v>=MIN&&v<=MAX);
+  const pass=timing&&entropyOK();
+
+  status.className="quat-status "+(pass?"success":"fail");
+  status.textContent=pass?"Human verified ✔":"Verification failed";
+});
+</script>
+
+</body>
+</html>
