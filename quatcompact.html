@@ -2,115 +2,84 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>QUAT Compact</title>
-
+<title>QUAT Compact Secure</title>
 <style>
-/* ===== DEFAULTS (DEV CAN OVERRIDE) ===== */
-#quat{
+:root{
   --quat-primary:#2563eb;
   --quat-submit:#7c3aed;
   --quat-success:#22c55e;
   --quat-fail:#ef4444;
   --quat-border:#64748b;
   --quat-bg:transparent;
-  --quat-text:inherit;
+  --quat-text:#ffffff;
 }
-
-#quat{
-  color:var(--quat-text);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:8px;
+body{
+  margin:0;
   background:var(--quat-bg);
+  color:var(--quat-text);
   font-family:system-ui,sans-serif;
-}
-
-/* ===== HERO ===== */
-#hero{
   display:flex;
   align-items:center;
-  gap:14px;
+  justify-content:center;
+  height:100vh;
 }
-
+#quat{display:flex;flex-direction:column;align-items:center;gap:8px;}
+#hero{display:flex;align-items:center;gap:14px;}
 .circle{
-  width:46px;height:46px;
-  border-radius:50%;
+  width:46px;height:46px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  font-weight:700;
-  cursor:pointer;
-  user-select:none;
+  font-weight:700;cursor:pointer;user-select:none;
   background:var(--quat-primary);
 }
 .circle.submit{background:var(--quat-submit);}
-
 .boxes{display:flex;gap:6px;}
 .box{
-  width:38px;height:38px;
-  border:2px solid var(--quat-border);
-  background:transparent;
-  display:flex;align-items:center;justify-content:center;
-  font-weight:700;
+  width:38px;height:38px;border:2px solid var(--quat-border);
+  background:transparent;display:flex;align-items:center;
+  justify-content:center;font-weight:700;
 }
 .box.active{
   background:var(--quat-success);
   border-color:var(--quat-success);
 }
-
-/* ===== STATUS ===== */
-#status{
-  font-size:13px;
-  min-height:18px;
-}
+#status{font-size:13px;min-height:18px;}
 .fail{color:var(--quat-fail);}
-
-/* ===== VERIFIED ===== */
-#verified{
-  display:none;
-  align-items:center;
-  gap:8px;
-  font-size:16px;
-  font-weight:600;
-  color:var(--quat-success);
-}
+#verified{display:none;align-items:center;gap:8px;font-size:16px;font-weight:600;color:var(--quat-success);}
 </style>
 </head>
-
 <body>
 
 <div id="quat">
-
   <div id="hero">
     <div class="circle" id="tap">●</div>
-
     <div class="boxes">
       <div class="box"></div>
       <div class="box"></div>
       <div class="box"></div>
       <div class="box"></div>
     </div>
-
     <div class="circle submit" id="submit">●</div>
   </div>
-
   <div id="status"></div>
   <div id="verified">✔ Verified by QUAT</div>
-
 </div>
 
 <script>
-/* ===== SILENT CONSOLE ===== */
+/* ===== BLOCK USER CONSOLE ===== */
 (()=>{["log","warn","error","debug","info","trace"].forEach(k=>console[k]=()=>{});})();
 
 /* ===== CONFIG ===== */
 const LETTERS=["Q","U","A","T"];
-const MIN=80,MAX=350;
+const MIN=80, MAX=350;
+const ENTROPY_THRESHOLD=1.8;
+const MIN_UNIQUE=8;
 
-/* ===== DEVICE ===== */
-const IS_TOUCH=("ontouchstart"in window)||navigator.maxTouchPoints>0;
+/* ===== DEVICE DETECTION ===== */
+const IS_TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints>0;
+const USE_ENTROPY = !IS_TOUCH;
 
 /* ===== STATE ===== */
-let clicks=[],submitted=false;
+let clicks=[], moves=[], submitted=false, last=null;
 
 /* ===== ELEMENTS ===== */
 const boxes=document.querySelectorAll(".box");
@@ -120,32 +89,62 @@ const verified=document.getElementById("verified");
 const tap=document.getElementById("tap");
 const submit=document.getElementById("submit");
 
-/* ===== UI ===== */
+/* ===== UI UPDATE ===== */
 function paint(){
   boxes.forEach((b,i)=>{
     b.classList.toggle("active",i<clicks.length);
-    b.textContent=i<clicks.length?LETTERS[i]:"";
+    b.textContent=i<clicks.length ? LETTERS[i] : "";
   });
 }
 
 /* ===== RESET ===== */
 function resetAll(){
-  clicks=[];
-  submitted=false;
-  boxes.forEach(b=>{b.classList.remove("active");b.textContent="";});
+  clicks=[]; moves=[]; submitted=false; last=null;
+  boxes.forEach(b=>{b.classList.remove("active"); b.textContent="";});
   status.textContent="";
+  hero.style.display="flex";
+  verified.style.display="none";
+}
+
+/* ===== POINTER ENTROPY (DESKTOP ONLY) ===== */
+if(USE_ENTROPY){
+  window.addEventListener("pointermove", e=>{
+    if(submitted || !e.isTrusted || e.pointerType!=="mouse") return;
+    if(last){
+      const dx=e.clientX-last.x;
+      const dy=e.clientY-last.y;
+      if(dx||dy){
+        moves.push({x:dx,y:dy});
+        if(moves.length>150) moves.shift();
+      }
+    }
+    last={x:e.clientX, y:e.clientY};
+  });
+}
+
+/* ===== ENTROPY CHECK ===== */
+function entropyOK(){
+  if(!USE_ENTROPY) return true;
+  if(moves.length<30) return false;
+  const mags = moves.map(p=>Math.hypot(p.x,p.y).toFixed(1));
+  const unique = new Set(mags).size;
+  const freq = {};
+  mags.forEach(m=>freq[m]=(freq[m]||0)+1);
+  let H=0, n=mags.length;
+  for(const k in freq){const p=freq[k]/n; H-=p*Math.log2(p);}
+  return H>=ENTROPY_THRESHOLD && unique>=MIN_UNIQUE;
 }
 
 /* ===== TAP ===== */
-tap.addEventListener("pointerdown",e=>{
-  if(submitted||!e.isTrusted||clicks.length>=4) return;
+tap.addEventListener("pointerdown", e=>{
+  if(submitted || !e.isTrusted || clicks.length>=4) return;
   clicks.push(performance.now());
   paint();
 });
 
 /* ===== SUBMIT ===== */
-submit.addEventListener("pointerdown",e=>{
-  if(submitted||!e.isTrusted) return;
+submit.addEventListener("pointerdown", e=>{
+  if(submitted || !e.isTrusted) return;
   submitted=true;
 
   if(clicks.length!==4){
@@ -159,8 +158,14 @@ submit.addEventListener("pointerdown",e=>{
     clicks[3]-clicks[2]
   ];
 
-  const timingOK=t.every(v=>v>=MIN&&v<=MAX);
-  timingOK ? success() : fail("Behavior verification failed");
+  const timingOK = t.every(v => v>=MIN && v<=MAX);
+  const entropyOKResult = entropyOK();
+
+  if(timingOK && entropyOKResult){
+    success();
+  } else {
+    fail("Behavior verification failed");
+  }
 });
 
 /* ===== SUCCESS ===== */
@@ -168,10 +173,8 @@ function success(){
   hero.style.display="none";
   verified.style.display="flex";
 
-  // 🔔 SIGNAL TO WEBSITE
-  window.dispatchEvent(new CustomEvent("quat:verified",{
-    detail:{verified:true, method:"QUAT"}
-  }));
+  // 🔔 SIGNAL TO PARENT
+  window.parent.postMessage({type:"QUAT_PASS"}, "*");
 }
 
 /* ===== FAIL ===== */
