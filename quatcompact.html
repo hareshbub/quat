@@ -6,14 +6,14 @@
 
 <style>
 :root {
-  --quat-accent: #22c55e;
-  --quat-primary: #2563eb;
-  --quat-entropy: #7c3aed;
-  --quat-bg: #020617;
-  --quat-border: #64748b;
+  --quat-accent:#22c55e;
+  --quat-primary:#2563eb;
+  --quat-entropy:#7c3aed;
+  --quat-bg:#020617;
+  --quat-border:#64748b;
 }
 
-body {
+body{
   background:#0f172a;
   color:#e5e7eb;
   font-family:system-ui,sans-serif;
@@ -23,23 +23,20 @@ body {
   height:100vh;
 }
 
-/* ===== WRAPPER ===== */
-#quat {
+#quat{
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:6px;
 }
 
-/* ===== ROW ===== */
-.quat-row {
+.quat-row{
   display:flex;
   align-items:center;
   gap:14px;
 }
 
-/* ===== CIRCLES ===== */
-.quat-circle {
+.quat-circle{
   width:46px;
   height:46px;
   border-radius:50%;
@@ -52,17 +49,16 @@ body {
   background:var(--quat-primary);
 }
 
-.quat-circle.entropy {
+.quat-circle.entropy{
   background:var(--quat-entropy);
 }
 
-/* ===== BOXES ===== */
-.quat-boxes {
+.quat-boxes{
   display:flex;
   gap:6px;
 }
 
-.quat-box {
+.quat-box{
   width:38px;
   height:38px;
   border:2px solid var(--quat-border);
@@ -73,21 +69,20 @@ body {
   font-weight:700;
 }
 
-.quat-box.active {
+.quat-box.active{
   background:var(--quat-accent);
   color:#022c22;
   border-color:var(--quat-accent);
 }
 
-/* ===== TEXT ===== */
-.quat-status {
+.quat-status{
   font-size:13px;
   min-height:18px;
 }
-.success {color:#22c55e;}
-.fail {color:#ef4444;}
+.success{color:#22c55e;}
+.fail{color:#ef4444;}
 
-.quat-note {
+.quat-note{
   font-size:12px;
   opacity:.75;
 }
@@ -124,14 +119,17 @@ const MIN=80, MAX=350;
 const ENTROPY_THRESHOLD=1.8;
 const MIN_UNIQUE=8;
 
-/* ===== CALLBACKS (DEVELOPER HOOKS) ===== */
-const QUAT_CALLBACKS = {
-  onPass: () => {
-    // developer continues to next test here
+/* ===== DEVICE CHECK ===== */
+const IS_TOUCH_DEVICE =
+  ("ontouchstart" in window) ||
+  navigator.maxTouchPoints > 0;
+
+/* ===== CALLBACKS ===== */
+const QUAT_CALLBACKS={
+  onPass:()=>{
+    window.parent?.postMessage("QUAT_PASS","*");
   },
-  onFail: () => {
-    // developer handles failure here
-  }
+  onFail:()=>{}
 };
 
 /* ===== STATE ===== */
@@ -146,14 +144,16 @@ const status=document.getElementById("status");
 /* ===== BLOCK KEY INPUT ===== */
 ["keydown","keypress","keyup"].forEach(e=>{
   window.addEventListener(e,ev=>{
-    ev.preventDefault(); ev.stopPropagation();
+    ev.preventDefault();
+    ev.stopPropagation();
   },{passive:false});
 });
 
-/* ===== TRUSTED POINTER ENTROPY ===== */
+/* ===== POINTER ENTROPY (DESKTOP ONLY) ===== */
 window.addEventListener("pointermove",e=>{
+  if(IS_TOUCH_DEVICE) return;
   if(submitted||!e.isTrusted) return;
-  if(!["mouse","touch","pen"].includes(e.pointerType)) return;
+  if(e.pointerType!=="mouse") return;
 
   if(last){
     const dx=e.clientX-last.x;
@@ -168,12 +168,18 @@ window.addEventListener("pointermove",e=>{
 
 /* ===== ENTROPY CHECK ===== */
 function entropyOK(){
+  if(IS_TOUCH_DEVICE) return true; // 🔥 MOBILE BYPASS
   if(moves.length<30) return false;
+
   const mags=moves.map(p=>Math.hypot(p.x,p.y).toFixed(1));
   const unique=new Set(mags).size;
   const freq={}; mags.forEach(m=>freq[m]=(freq[m]||0)+1);
+
   let H=0, n=mags.length;
-  for(const k in freq){const p=freq[k]/n; H-=p*Math.log2(p);}
+  for(const k in freq){
+    const p=freq[k]/n;
+    H-=p*Math.log2(p);
+  }
   return H>=ENTROPY_THRESHOLD && unique>=MIN_UNIQUE;
 }
 
@@ -204,7 +210,6 @@ tap.addEventListener("pointerdown",e=>{
   if(
     submitted||
     !e.isTrusted||
-    !["mouse","touch","pen"].includes(e.pointerType)||
     clicks.length>=4
   ) return;
 
@@ -214,18 +219,13 @@ tap.addEventListener("pointerdown",e=>{
 
 /* ===== SUBMIT ===== */
 submit.addEventListener("pointerdown",e=>{
-  if(
-    submitted||
-    !e.isTrusted||
-    !["mouse","touch","pen"].includes(e.pointerType)
-  ) return;
-
+  if(submitted||!e.isTrusted) return;
   submitted=true;
 
   if(clicks.length!==4){
     status.textContent="Complete QUAT first";
     status.className="quat-status fail";
-    setTimeout(resetState, 600);
+    setTimeout(resetState,600);
     return;
   }
 
@@ -236,15 +236,13 @@ submit.addEventListener("pointerdown",e=>{
   ];
 
   const timing=t.every(v=>v>=MIN&&v<=MAX);
-  const pass=timing&&entropyOK();
+  const pass=timing && entropyOK();
 
   status.className="quat-status "+(pass?"success":"fail");
   status.textContent=pass?"Human verified ✔":"Verification failed";
 
-  if(pass) QUAT_CALLBACKS.onPass();
-  else QUAT_CALLBACKS.onFail();
-
-  setTimeout(resetState, 700);
+  pass ? QUAT_CALLBACKS.onPass() : QUAT_CALLBACKS.onFail();
+  setTimeout(resetState,700);
 });
 </script>
 
