@@ -23,12 +23,12 @@ body {
   height:100vh;
 }
 
-/* ===== QUAT WRAPPER ===== */
+/* ===== WRAPPER ===== */
 #quat {
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:8px;
+  gap:6px;
 }
 
 /* ===== ROW ===== */
@@ -56,7 +56,7 @@ body {
   background:var(--quat-entropy);
 }
 
-/* ===== SQUARES ===== */
+/* ===== BOXES ===== */
 .quat-boxes {
   display:flex;
   gap:6px;
@@ -79,18 +79,27 @@ body {
   border-color:var(--quat-accent);
 }
 
-/* ===== FOOTER ===== */
-.quat-note {
-  font-size:12px;
-  opacity:.8;
-}
-
+/* ===== TEXT ===== */
 .quat-status {
   font-size:13px;
   min-height:18px;
 }
 .success {color:#22c55e;}
 .fail {color:#ef4444;}
+
+.quat-note {
+  font-size:12px;
+  opacity:.75;
+}
+
+#quatReset{
+  background:none;
+  border:none;
+  color:#94a3b8;
+  font-size:12px;
+  cursor:pointer;
+}
+#quatReset:hover{color:#e5e7eb;}
 </style>
 </head>
 
@@ -111,18 +120,19 @@ body {
   </div>
 
   <div class="quat-status" id="status"></div>
-  <div class="quat-note">powered by quat org </div>
+  <button id="quatReset">↻ Reset</button>
+  <div class="quat-note">QUAT — human verification using timing & entropy</div>
 </div>
 
 <script>
-/* ===== LOCK CONSOLE ===== */
+/* ===== HARD CONSOLE LOCK ===== */
 (()=>{["log","warn","error","debug","info","trace"].forEach(k=>console[k]=()=>{});})();
 
 /* ===== CONFIG ===== */
-const LETTERS = ["Q","U","A","T"];
-const MIN = 80, MAX = 350;
-const ENTROPY_THRESHOLD = 1.8;
-const MIN_UNIQUE = 8;
+const LETTERS=["Q","U","A","T"];
+const MIN=80, MAX=350;
+const ENTROPY_THRESHOLD=1.8;
+const MIN_UNIQUE=8;
 
 /* ===== STATE ===== */
 let clicks=[], moves=[], submitted=false, last=null;
@@ -132,15 +142,16 @@ const boxes=document.querySelectorAll(".quat-box");
 const tap=document.getElementById("quatTap");
 const submit=document.getElementById("quatSubmit");
 const status=document.getElementById("status");
+const reset=document.getElementById("quatReset");
 
-/* ===== BLOCK KEYS ===== */
+/* ===== BLOCK KEY INPUT ===== */
 ["keydown","keypress","keyup"].forEach(e=>{
   window.addEventListener(e,ev=>{
     ev.preventDefault(); ev.stopPropagation();
   },{passive:false});
 });
 
-/* ===== TRUSTED POINTER ===== */
+/* ===== TRUSTED POINTER ENTROPY ===== */
 window.addEventListener("pointermove",e=>{
   if(submitted||!e.isTrusted) return;
   if(!["mouse","touch","pen"].includes(e.pointerType)) return;
@@ -156,13 +167,13 @@ window.addEventListener("pointermove",e=>{
   last={x:e.clientX,y:e.clientY};
 });
 
-/* ===== ENTROPY ===== */
+/* ===== ENTROPY CHECK ===== */
 function entropyOK(){
   if(moves.length<30) return false;
   const mags=moves.map(p=>Math.hypot(p.x,p.y).toFixed(1));
   const unique=new Set(mags).size;
   const freq={}; mags.forEach(m=>freq[m]=(freq[m]||0)+1);
-  let H=0; const n=mags.length;
+  let H=0, n=mags.length;
   for(const k in freq){const p=freq[k]/n; H-=p*Math.log2(p);}
   return H>=ENTROPY_THRESHOLD && unique>=MIN_UNIQUE;
 }
@@ -177,14 +188,25 @@ function paint(){
 
 /* ===== TAP ===== */
 tap.addEventListener("pointerdown",e=>{
-  if(submitted||!e.isTrusted||clicks.length>=4) return;
+  if(
+    submitted||
+    !e.isTrusted||
+    !["mouse","touch","pen"].includes(e.pointerType)||
+    clicks.length>=4
+  ) return;
+
   clicks.push(performance.now());
   paint();
 });
 
 /* ===== SUBMIT ===== */
 submit.addEventListener("pointerdown",e=>{
-  if(submitted||!e.isTrusted) return;
+  if(
+    submitted||
+    !e.isTrusted||
+    !["mouse","touch","pen"].includes(e.pointerType)
+  ) return;
+
   submitted=true;
 
   if(clicks.length!==4){
@@ -204,7 +226,19 @@ submit.addEventListener("pointerdown",e=>{
   status.className="quat-status "+(pass?"success":"fail");
   status.textContent=pass?"Human verified ✔":"Verification failed";
 });
+
+/* ===== RESET ===== */
+reset.onclick=()=>{
+  clicks=[];
+  moves=[];
+  submitted=false;
+  last=null;
+  status.textContent="";
+  status.className="quat-status";
+  boxes.forEach(b=>{b.classList.remove("active"); b.textContent="";});
+};
 </script>
 
 </body>
 </html>
+
